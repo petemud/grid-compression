@@ -9,8 +9,10 @@
 
 #ifdef LOCAL
 #include <vector>
+#include <array>
 #else
 ESC#include <vector>
+ESC#include <array>
 #endif
 
 template<typename RandomGenerator>
@@ -86,17 +88,23 @@ public:
     /*! Remove one from solution, insert two 1-tight */
     void insert_one_two() {
         while (!one_two_candidates.empty()) {
-            auto candidate = random(one_two_candidates);
-            one_two_candidates.erase(candidate);
+            auto erase_candidate = random(one_two_candidates);
+            one_two_candidates.erase(erase_candidate);
 
-            if (!solution.contains(candidate))
+            if (!solution.contains(erase_candidate))
                 continue;
 
+            unsigned solutions_number = 0;
+            std::array<graph::vertex, 2> insert_candidates;
+
             std::vector<graph::vertex> one_tight_neighbors;
-            one_tight_neighbors.reserve(graph.neighbors(candidate).size());
-            for (auto neighbor: graph.neighbors(candidate)) {
-                if (tightness[neighbor] == 1) {
-                    one_tight_neighbors.push_back(neighbor);
+            {
+                auto &neighbors = graph.neighbors(erase_candidate);
+                one_tight_neighbors.reserve(neighbors.size());
+                for (auto neighbor: neighbors) {
+                    if (tightness[neighbor] == 1) {
+                        one_tight_neighbors.push_back(neighbor);
+                    }
                 }
             }
 
@@ -104,18 +112,22 @@ public:
                       neighbors_end  = one_tight_neighbors.end();
                  neighbor1_iter != neighbors_end; ++neighbor1_iter)
             {
-                auto &neighbor1 = *neighbor1_iter;
+                auto neighbor1 = *neighbor1_iter;
                 auto first = graph.neighbors(neighbor1).begin(),
                      last = graph.neighbors(neighbor1).end();
                 auto neighbor2_iter = neighbor1_iter + 1;
-                neighbor2_iter = difference(neighbor2_iter, neighbors_end, first, last);
-                if (neighbor2_iter != neighbors_end) {
-                    auto &neighbor2 = *neighbor2_iter;
-                    erase(candidate);
-                    insert(neighbor1);
-                    insert(neighbor2);
-                    break;
-                }
+                for_each_difference(neighbor2_iter, neighbors_end, first, last,
+                [neighbor1, &insert_candidates, &solutions_number, &random = random](auto neighbor2) {
+                    if (random(0u, solutions_number++) == 0) {
+                        insert_candidates = {neighbor1, neighbor2};
+                    }
+                });
+            }
+
+            if (solutions_number > 0) {
+                erase(erase_candidate);
+                insert(insert_candidates[0]);
+                insert(insert_candidates[1]);
             }
         }
     }

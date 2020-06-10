@@ -30,9 +30,9 @@ std::ostream& operator<<(std::ostream& ostream, const std::chrono::duration<Rep,
 }
 
 int main() {
-    auto duration = std::chrono::milliseconds(3950);
+    auto duration = std::chrono::milliseconds(3960);
     auto program_timer = timer<decltype(duration)>(duration);
-    auto random = random_picker<std::mt19937>(13);
+    auto random = random_picker<std::mt19937>(23);
 #ifdef LOCAL
     std::ifstream input_file("input.txt", std::ifstream::in);
     io io(input_file, std::cout);
