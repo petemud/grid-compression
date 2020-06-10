@@ -1,28 +1,32 @@
 #ifndef GRID_COMPRESSION_ITERATED_LOCAL_SEARCH_H
 #define GRID_COMPRESSION_ITERATED_LOCAL_SEARCH_H
 
-#include <vector>
-#include <stack>
-#include "../graph.h"
-#include "../algorithm.h"
-#include "../int_set.h"
+#include "graph.h"
+#include "algorithm.h"
+#include "int_set.h"
 #include "transaction.h"
+#include "random_picker.h"
+
+#ifdef LOCAL
+#include <vector>
+#else
+ESC#include <vector>
+#endif
 
 template<typename RandomGenerator>
 class ils {
     const class graph &graph;
-    random_picker<RandomGenerator> &random;
-    std::vector<std::set<graph::vertex>> solution_neighbors;
+    RandomGenerator &random;
     int_set<graph::vertex, true> one_two_candidates;
     int_set<graph::vertex, true> zero_tight;
     int_set<graph::vertex, true> nonzero_tight;
     std::vector<unsigned> tightness;
-    transaction transaction;
+    class transaction transaction;
 
 public:
     int_set<graph::vertex, true> solution;
 
-    ils(const class graph &graph, random_picker<RandomGenerator> &random)
+    ils(const class graph &graph, RandomGenerator &random)
     : graph(graph), random(random) {
         solution.reserve(graph.order());
         tightness.resize(graph.order(), 0);
@@ -141,8 +145,6 @@ public:
 //            while (random(1, inner_probability) == 1) forced++;
 //        }
     }
-
-
 
     bool iteration() {
         if (graph.order() <= solution.size()) {

@@ -1,7 +1,11 @@
 #ifndef GRID_COMPRESSION_RANDOM_PICKER_H
 #define GRID_COMPRESSION_RANDOM_PICKER_H
 
-//#include <random>
+#ifdef LOCAL
+#include <random>
+#else
+ESC#include <random>
+#endif
 
 template<typename Generator = std::minstd_rand0>
 class random_picker {
@@ -29,15 +33,5 @@ public:
         return c[operator()<decltype(c.size())>(0, c.size() - 1)];
     }
 };
-
-template<typename Generator = std::mt19937>
-random_picker<Generator> make_random_picker() {
-    return random_picker<Generator>();
-}
-
-template<typename Generator = std::mt19937>
-random_picker<Generator> make_random_picker(typename Generator::result_type seed) {
-    return random_picker<Generator>(seed);
-}
 
 #endif //GRID_COMPRESSION_RANDOM_PICKER_H

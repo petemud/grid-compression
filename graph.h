@@ -1,28 +1,20 @@
 #ifndef GRID_COMPRESSION_GRAPH_H
 #define GRID_COMPRESSION_GRAPH_H
 
-//#include <vector>
+#ifdef LOCAL
+#include <vector>
+#else
+ESC#include <vector>
+#endif
 
 class graph {
 public:
     struct vertex {
-        typedef uint_least32_t index_type;
+        typedef unsigned index_type;
         index_type index;
-
-//        vertex() = default;
-//        explicit constexpr vertex(index_type index): index(index) {}
 
         operator index_type() const {
             return index;
-        }
-
-        vertex &operator++() {
-            ++index;
-            return *this;
-        }
-
-        bool operator!=(const vertex &other) const {
-            return index != other.index;
         }
 
         bool operator<(const vertex &other) const {
@@ -31,37 +23,34 @@ public:
     };
 
     struct vertex_iterator {
-        class vertex vertex;
-
-//        vertex_iterator(class vertex vertex): vertex(vertex) {}
+        vertex::index_type index;
 
         class vertex operator*() {
-            return vertex;
+            return {index};
         }
 
         vertex_iterator &operator++() {
-            ++vertex;
+            ++index;
             return *this;
         }
 
         bool operator!=(const vertex_iterator &other) const {
-            return vertex != other.vertex;
+            return index != other.index;
         }
-
     };
 
-    size_t maximum_degree = 0;
+    vertex::index_type maximum_degree = 0;
     std::vector<std::vector<vertex>> adjacency_list;
 
     graph() = default;
 
-    graph(size_t maximum_order, size_t maximum_degree = 0)
-    : maximum_degree(maximum_degree) {
-        reserve(maximum_order);
+    graph(vertex::index_type maximum_order, vertex::index_type maximum_degree = 0) {
+        reserve(maximum_order, maximum_degree);
     }
 
-    void reserve(size_t maximum_order) {
+    void reserve(vertex::index_type maximum_order, vertex::index_type maximum_degree = 0) {
         adjacency_list.reserve(maximum_order);
+        this->maximum_degree = maximum_degree;
     }
 
     vertex add_vertex() {
@@ -84,12 +73,12 @@ public:
         return adjacency_list.size();
     }
 
-    auto begin() const {
-        return vertex_iterator{vertex{0}};
+    vertex_iterator begin() const {
+        return {0};
     }
 
-    auto end() const {
-        return vertex_iterator{vertex{adjacency_list.size()}};
+    vertex_iterator end() const {
+        return {adjacency_list.size()};
     }
 };
 

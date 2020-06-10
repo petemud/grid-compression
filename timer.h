@@ -1,7 +1,11 @@
 #ifndef GRID_COMPRESSION_TIMER_H
 #define GRID_COMPRESSION_TIMER_H
 
-//#include <chrono>
+#ifdef LOCAL
+#include <chrono>
+#else
+ESC#include <chrono>
+#endif
 
 template<typename Duration, typename Clock = std::chrono::steady_clock>
 class timer {
@@ -26,11 +30,6 @@ public:
         return duration() > max_duration;
     }
 };
-
-template<typename Duration>
-timer<Duration> make_timer(Duration max_duration) {
-    return timer<Duration>(max_duration);
-}
 
 
 #endif //GRID_COMPRESSION_TIMER_H

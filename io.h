@@ -1,13 +1,20 @@
 #ifndef GRID_COMPRESSION_INPUT_H
 #define GRID_COMPRESSION_INPUT_H
 
-//#include <array>
-//#include <vector>
-//#include <istream>
-//#include <ostream>
-
 #include "graph.h"
+
+#ifdef LOCAL
+#include <vector>
+#include <istream>
+#include <ostream>
+#else
+ESC#include <vector>
+ESC#include <istream>
+ESC#include <ostream>
+#endif
+
 constexpr static graph::vertex null_vertex{graph::vertex::index_type(-1)};
+
 class io {
     class rectangle {
         int row1, col1, row2, col2;
@@ -31,6 +38,8 @@ class io {
     graph::vertex vertices[2][MAX_GRID_SIZE + MAX_RECT_SIZE - 1][MAX_GRID_SIZE + MAX_RECT_SIZE - 1];
     std::vector<rectangle> rectangles;
 
+    std::ostream &output;
+
     void init_partial_sums() {
         for (int row = 0; row < h; ++row) partial_sum[row][0] = 0;
         for (int col = 0; col < w; ++col) partial_sum[0][col] = 0;
@@ -51,7 +60,7 @@ public:
     /** T * N * M */
     int tnm;
 
-    explicit io(std::istream &input, std::ostream &output) {
+    io(std::istream &input, std::ostream &output): output(output) {
         int t;
         input >> h >> w >> n >> m >> t;
         tnm = t * n * m;
@@ -75,14 +84,14 @@ public:
                 +partial_sum[row_end][col_end];
     }
 
-    graph construct_graph() {
+    void operator>>(graph &graph) {
         int dirs = n != m ? 2 : 1;
         int max_order = (w + n - 2) * (h + m - 2)
                         + (w + m - 2) * (h + n - 2);
         int max_degree = dirs * (2 * n - 1) * (2 * m - 1);
         int max_size = max_order * max_degree;
         rectangles.reserve(max_order);
-        graph graph(max_order, max_degree);
+        graph.reserve(max_order, max_degree);
 
         for (int dir1 = 0; dir1 < dirs; ++dir1) {
             int n1 = dir1 ? n : m,
@@ -94,7 +103,7 @@ public:
             for (int row1 = row1_begin; row1 < row1_end; ++row1) {
                 for (int col1 = col1_begin; col1 < col1_end; ++col1) {
                     if (sum(row1 - n1, row1, col1 - m1, col1) < tnm) {
-                        vertices[dir1][row1][col1] = graph::vertex{-1u};
+                        vertices[dir1][row1][col1] = null_vertex;
                         continue;
                     }
                     auto v1 = vertices[dir1][row1][col1] = graph.add_vertex();
@@ -121,15 +130,13 @@ public:
                 }
             }
         }
-
-        return graph;
     }
 
     template<typename T>
-    void output(const T &maximum_independent_set) {
-        std::cout << maximum_independent_set.size() << "\n";
+    void operator<<(const T &maximum_independent_set) {
+        output << maximum_independent_set.size() << "\n";
         for (auto vertex: maximum_independent_set) {
-            std::cout << rectangles[vertex] << "\n";
+            output << rectangles[vertex] << "\n";
         }
     }
 };

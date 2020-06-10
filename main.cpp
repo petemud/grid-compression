@@ -1,21 +1,22 @@
-//#include <iostream>
-//#ifdef FILE_INPUT
-//    #include <fstream>
-//#endif
+#define ESC
 
-#include <bits/stdc++.h>
-
+#include "io.h"
 #include "random_picker.h"
 #include "timer.h"
-#include "io.h"
-#include "maximum_independent_set/iterated_local_search.h"
-//#include "numvc.h"
+#include "iterated_local_search.h"
+
+#ifdef LOCAL
+#include <iostream>
+#include <fstream>
+#else
+ESC#include <iostream>
+#endif
 
 template<typename Iteration, typename Timer>
 void run_until_timeout(Iteration iteration, const Timer &timer) {
     int iterations = 0;
     while (iteration()) {
-        if (iterations % 100 == 0 && timer.timeout())
+        if (iterations % 50 == 0 && timer.timeout())
             break;
         ++iterations;
     }
@@ -29,40 +30,29 @@ std::ostream& operator<<(std::ostream& ostream, const std::chrono::duration<Rep,
 }
 
 int main() {
-    auto program_timer = make_timer(std::chrono::milliseconds(3980));
-    auto random = make_random_picker<std::mt19937>(13);
-
-#ifndef FILE_INPUT
-    std::ios::sync_with_stdio(false);
-    io io(std::cin, std::cout);
-#else
+    auto duration = std::chrono::milliseconds(3950);
+    auto program_timer = timer<decltype(duration)>(duration);
+    auto random = random_picker<std::mt19937>(13);
+#ifdef LOCAL
     std::ifstream input_file("input.txt", std::ifstream::in);
     io io(input_file, std::cout);
+#else
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(nullptr);
+    io io(std::cin, std::cout);
 #endif
-    auto graph = io.construct_graph();
+    graph graph;
+    io >> graph;
 
     std::cerr << "time: " << program_timer.duration() << "\n";
-    ils ils(graph, random);
+    ils<decltype(random)> ils(graph, random);
     std::cerr << "time: " << program_timer.duration() << "\n";
     run_until_timeout([&ils]() {
         return ils.iteration();
     }, program_timer);
 
     auto &maximum_independent_set = ils.solution;
-    //io.output(maximum_independent_set);
-
-//    auto mvc_solver = make_numvc(graph, random);
-//    auto in_minimum_vertex_cover = mvc_solver.run_until_timeout(program_timer);
-//
-//    std::vector<graph::vertex> maximum_independent_set;
-//    maximum_independent_set.reserve(graph.size());
-//    for (int vertex = 0; vertex < graph.size(); ++vertex) {
-//        if (!in_minimum_vertex_cover[vertex]) {
-//            maximum_independent_set.push_back(vertex);
-//        }
-//    }
-//
-//    io.output(maximum_independent_set);
+    io << maximum_independent_set;
 #ifdef LOCAL
     std::cerr << "result vertices: " << maximum_independent_set.size() << "\n";
     std::cerr << "total time: " << program_timer.duration() << "\n";

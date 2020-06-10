@@ -1,8 +1,13 @@
 #ifndef GRID_COMPRESSION_TRANSACTION_H
 #define GRID_COMPRESSION_TRANSACTION_H
 
+#include "graph.h"
+
+#ifdef LOCAL
 #include <vector>
-#include "../graph.h"
+#else
+ESC#include <vector>
+#endif
 
 class transaction {
     enum class type {
@@ -10,7 +15,7 @@ class transaction {
     };
 
     struct entry {
-        type type;
+        enum type type;
         graph::vertex vertex;
     };
 
