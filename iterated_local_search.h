@@ -10,6 +10,8 @@
 #ifdef LOCAL
 #include <vector>
 #include <array>
+#include <functional>
+
 #else
 ESC#include <vector>
 ESC#include <array>
@@ -20,18 +22,32 @@ class ils {
     const class graph &graph;
     RandomGenerator &random;
     int_set<graph::vertex, true> one_two_candidates;
-    int_set<graph::vertex, true> zero_tight;
-    int_set<graph::vertex, true> nonzero_tight;
+    int_set<graph::vertex> zero_tight;
+    int_set<graph::vertex> one_tight;
+    std::vector<unsigned> solution_neighbor;
+    int_set<graph::vertex> nonzero_tight;
     std::vector<unsigned> tightness;
+    std::vector<unsigned> taboo;
     class transaction transaction;
+
+    bool with_swaps;
 
 public:
     int_set<graph::vertex, true> solution;
 
-    ils(const class graph &graph, RandomGenerator &random)
-    : graph(graph), random(random) {
+    ils(const class graph &graph, RandomGenerator &random, bool with_swaps = true)
+    : graph(graph), random(random), transaction([this](graph::vertex vertex) {
+        insert<false, false>(vertex);
+    }, [this](graph::vertex vertex) {
+        erase<false, false>(vertex);
+    }, [this](graph::vertex erased, graph::vertex inserted) {
+        swap<false, false>(erased, inserted);
+    }), with_swaps(with_swaps) {
         solution.reserve(graph.order());
         tightness.resize(graph.order(), 0);
+        solution_neighbor.resize(graph.order(), 0);
+        taboo.resize(graph.order(), 0);
+        one_tight.reserve(graph.order());
 
         one_two_candidates.reserve(graph.order());
         nonzero_tight.reserve(graph.order());
@@ -40,52 +56,115 @@ public:
         for (auto vertex: graph) {
             zero_tight.insert(vertex);
         }
-        insert_all_zero_tight();
-        insert_one_two();
+        insert_zero_tight<false>();
+        insert_one_two<false>();
     }
 
+    template<bool record_transaction = true, bool update_candidates = true>
     void insert(graph::vertex vertex) {
         solution.insert(vertex);
-        transaction.insert(vertex);
-        if (tightness[vertex] == 0)
-            zero_tight.erase(vertex);
-        else
-            nonzero_tight.erase(vertex);
+        if (record_transaction) {
+            transaction.record_insert(vertex);
+        }
+        zero_tight.erase(vertex);
         for (auto neighbor: graph.neighbors(vertex)) {
+            solution_neighbor[neighbor] ^= vertex;
             if (tightness[neighbor] == 0) {
                 zero_tight.erase(neighbor);
+                one_tight.insert(neighbor);
+            }
+            if (tightness[neighbor] == 1) {
+                one_tight.erase(neighbor);
                 nonzero_tight.insert(neighbor);
             }
             ++tightness[neighbor];
-            one_two_candidates.erase<true>(neighbor);
+            if (update_candidates) {
+                one_two_candidates.erase<true>(neighbor);
+            }
         }
-        one_two_candidates.insert<true>(vertex);
+        if (update_candidates) {
+            one_two_candidates.insert<true>(vertex);
+        }
     }
 
+    template<bool record_transaction = true, bool update_candidates = true>
     void erase(graph::vertex vertex) {
         solution.erase(vertex);
-        transaction.erase(vertex);
-        if (tightness[vertex] == 0)
-            zero_tight.insert(vertex);
-        else
-            nonzero_tight.insert(vertex);
+        if (record_transaction)
+            transaction.record_erase(vertex);
+        zero_tight.insert(vertex);
         for (auto neighbor: graph.neighbors(vertex)) {
+            solution_neighbor[neighbor] ^= vertex;
             --tightness[neighbor];
             if (tightness[neighbor] == 0) {
                 zero_tight.insert(neighbor);
-                nonzero_tight.erase(neighbor);
+                one_tight.erase(neighbor);
             }
             if (tightness[neighbor] == 1) {
-                for (auto candidate: graph.neighbors(neighbor)) {
-                    if (solution.contains(candidate)) {
-                        one_two_candidates.insert<true>(candidate);
+                one_tight.insert(neighbor);
+                nonzero_tight.erase(neighbor);
+                if (update_candidates) {
+                    for (auto candidate: graph.neighbors(neighbor)) {
+                        if (solution.contains(candidate)) {
+                            one_two_candidates.insert<true>(candidate);
+                            break;
+                        }
                     }
                 }
             }
         }
     }
 
+    template<bool record_transaction = true, bool update_candidates = true>
+    void swap(graph::vertex erased, graph::vertex inserted) {
+        solution.swap(erased, inserted);
+        if (record_transaction) {
+            transaction.record_swap(erased, inserted);
+        }
+//        nonzero_tight.swap(inserted, erased);
+        one_tight.swap(inserted, erased);
+
+        for (auto neighbor: graph.neighbors(erased)) {
+            solution_neighbor[neighbor] ^= erased;
+            --tightness[neighbor];
+            if (neighbor != inserted && tightness[neighbor] == 0) {
+                zero_tight.insert(neighbor);
+                one_tight.erase(neighbor);
+            }
+            if (tightness[neighbor] == 1) {
+                one_tight.insert(neighbor);
+                nonzero_tight.erase(neighbor);
+                if (update_candidates) {
+                    for (auto candidate: graph.neighbors(neighbor)) {
+                        if (solution.contains(candidate)) {
+                            one_two_candidates.insert<true>(candidate);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        for (auto neighbor: graph.neighbors(inserted)) {
+            solution_neighbor[neighbor] ^= inserted;
+            if (neighbor != erased && tightness[neighbor] == 0) {
+                zero_tight.erase(neighbor);
+                one_tight.insert(neighbor);
+            }
+            if (tightness[neighbor] == 1) {
+                one_tight.erase(neighbor);
+                nonzero_tight.insert(neighbor);
+            }
+            ++tightness[neighbor];
+        }
+        if (update_candidates) {
+            one_two_candidates.insert<true>(inserted);
+        }
+    }
+
+    std::vector<graph::vertex> one_tight_neighbors;
+
     /*! Remove one from solution, insert two 1-tight */
+    template<bool record_transaction = true>
     void insert_one_two() {
         while (!one_two_candidates.empty()) {
             auto erase_candidate = random(one_two_candidates);
@@ -97,9 +176,9 @@ public:
             unsigned solutions_number = 0;
             std::array<graph::vertex, 2> insert_candidates;
 
-            std::vector<graph::vertex> one_tight_neighbors;
             {
                 auto &neighbors = graph.neighbors(erase_candidate);
+                one_tight_neighbors.clear();
                 one_tight_neighbors.reserve(neighbors.size());
                 for (auto neighbor: neighbors) {
                     if (tightness[neighbor] == 1) {
@@ -118,66 +197,89 @@ public:
                 auto neighbor2_iter = neighbor1_iter + 1;
                 for_each_difference(neighbor2_iter, neighbors_end, first, last,
                 [neighbor1, &insert_candidates, &solutions_number, &random = random](auto neighbor2) {
-                    if (random(0u, solutions_number++) == 0) {
+                    if (random(0, solutions_number++) == 0) {
                         insert_candidates = {neighbor1, neighbor2};
                     }
                 });
             }
 
             if (solutions_number > 0) {
-                erase(erase_candidate);
-                insert(insert_candidates[0]);
-                insert(insert_candidates[1]);
+                swap<record_transaction>(erase_candidate, insert_candidates[0]);
+//                erase<record_transaction>(erase_candidate);
+//                insert<record_transaction>(insert_candidates[0]);
+                insert<record_transaction>(insert_candidates[1]);
             }
         }
     }
 
-    void insert_all_zero_tight() {
+    template<bool record_transaction = true, bool update_candidates = true>
+    bool insert_zero_tight() {
+        if (zero_tight.empty()) return false;
         while (!zero_tight.empty()) {
-            insert(random(zero_tight));
+            insert<record_transaction, update_candidates>(random(zero_tight));
         }
+        return true;
     }
 
+    template<bool record_transaction = true, bool update_candidates = true>
     void force(graph::vertex vertex) {
         for (auto neighbor: graph.neighbors(vertex)) {
             if (solution.contains(neighbor)) {
-                erase(neighbor);
+                erase<record_transaction, update_candidates>(neighbor);
             }
         }
-        insert(vertex);
+        insert<record_transaction, update_candidates>(vertex);
     }
 
-    void force() {
-        force(random(nonzero_tight));
-//        auto forced = 1;
-//        auto outer_probability = 2 * solution.size();
-//        auto inner_probability = 2;
-//        if (random(1, outer_probability) == 1) {
-//            forced++;
-//            while (random(1, inner_probability) == 1) forced++;
-//        }
+    template<bool record_transaction = true, bool update_candidates = true, int size = 4>
+    void force(const int_set<graph::vertex> &list) {
+        auto forced = 1;
+        auto probability = list.size();
+        if (random(0, probability) == 0) {
+            forced++;
+            while (random(0, 1)) forced++;
+        }
+        for (; !list.empty() && forced; --forced) {
+            auto candidate = random(list);
+            force<record_transaction, update_candidates>(candidate);
+        }
+        insert_zero_tight<record_transaction, update_candidates>();
+    }
+
+    template<bool record_transaction = true, bool update_candidates = true>
+    void swap_to_solution(unsigned improve_time = 1000) {
+        static unsigned taboo_counter = 0;
+        auto taboo_time = graph.order() / 2;
+        for (auto improve = improve_time; improve; --improve) {
+            if (one_tight.empty()) return;
+            auto vertex = random(one_tight);
+            ++taboo_counter;
+            if (taboo[vertex] > taboo_counter) continue;
+            auto neighbor = graph::vertex{solution_neighbor[vertex]};
+            swap<record_transaction, update_candidates>(neighbor, vertex);
+            taboo[vertex] = taboo_counter + taboo_time;
+            if (insert_zero_tight<record_transaction, update_candidates>())
+                improve = improve_time;
+        }
     }
 
     bool iteration() {
-        if (graph.order() <= solution.size()) {
+        if (graph.order() <= solution.size())
             return false;
+
+        force<true, true>(nonzero_tight);
+        insert_one_two();
+
+        static unsigned previous_solution_size = 0;
+        if (solution.size() < previous_solution_size) {
+            transaction.rollback();
+        } else {
+            transaction.clear();
+            if (with_swaps)
+                swap_to_solution<false, false>(1000);
+            previous_solution_size = solution.size();
         }
 
-        transaction.begin();
-        auto solution_before = solution.size();
-        force();
-        insert_all_zero_tight();
-        insert_one_two();
-        auto solution_after = solution.size();
-        if (solution_after < solution_before) {
-            transaction.rollback([this](graph::vertex v) {
-                insert(v);
-            }, [this](graph::vertex v) {
-                erase(v);
-            });
-        } else {
-            transaction.commit();
-        }
         return true;
     }
 };

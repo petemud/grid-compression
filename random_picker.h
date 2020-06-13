@@ -19,9 +19,9 @@ public:
     /**
      * Random integer on the range [min, max]
      */
-    template<typename Int>
-    Int operator()(Int min, Int max) {
-        std::uniform_int_distribution<Int> distribution(min, max);
+    template<typename Int1, typename Int2, typename Result = std::common_type_t<Int1, Int2>>
+    Result operator()(Int1 min, Int2 max) {
+        std::uniform_int_distribution<Result> distribution(min, max);
         return distribution(generator);
     }
 
@@ -30,7 +30,7 @@ public:
      */
     template<typename Container>
     auto operator()(const Container& c) {
-        return c[operator()<decltype(c.size())>(0, c.size() - 1)];
+        return c[operator()(0, c.size() - 1)];
     }
 };
 

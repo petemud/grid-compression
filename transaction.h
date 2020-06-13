@@ -5,54 +5,70 @@
 
 #ifdef LOCAL
 #include <vector>
+#include <functional>
 #else
 ESC#include <vector>
+ESC#include <functional>
 #endif
 
 class transaction {
     enum class type {
-        insert, erase
+        insert, erase, swap
     };
 
     struct entry {
         enum type type;
         graph::vertex vertex;
+        graph::vertex swap_vertex;
     };
 
+    std::function<void(graph::vertex)> insert;
+    std::function<void(graph::vertex)> erase;
+    std::function<void(graph::vertex, graph::vertex)> swap;
+
     std::vector<entry> history;
-    bool started = false;
 
 public:
-    void insert(graph::vertex vertex) {
-        if (started)
-            history.push_back({type::insert, vertex});
+    transaction(std::function<void(graph::vertex)> insert,
+                std::function<void(graph::vertex)> erase,
+                std::function<void(graph::vertex, graph::vertex)> swap)
+    : insert(insert), erase(erase), swap(swap) {}
+
+    auto begin() const {
+        return history.rbegin();
     }
 
-    void erase(graph::vertex vertex) {
-        if (started)
-            history.push_back({type::erase, vertex});
+    auto end() const {
+        return history.rend();
     }
 
-    void begin() {
-        started = true;
+    void record_insert(graph::vertex vertex) {
+        history.push_back({type::insert, vertex, graph::null_vertex});
     }
 
-    void commit() {
-        started = false;
+    void record_erase(graph::vertex vertex) {
+        history.push_back({type::erase, vertex, graph::null_vertex});
+    }
+
+    void record_swap(graph::vertex erased, graph::vertex inserted) {
+        history.push_back({type::swap, erased, inserted});
+    }
+
+    void clear() {
         history.clear();
     }
 
-    template<typename Insert, typename Erase>
-    void rollback(Insert insert, Erase erase) {
-        started = false;
-        for (auto iter = history.rbegin(), end = history.rend(); iter != end; ++iter) {
-            if (iter->type == type::insert) {
-                erase(iter->vertex);
+    void rollback() {
+        for (auto &entry: *this) {
+            if (entry.type == type::swap) {
+                swap(entry.swap_vertex, entry.vertex);
+            } else if (entry.type == type::insert) {
+                erase(entry.vertex);
             } else {
-                insert(iter->vertex);
+                insert(entry.vertex);
             }
         }
-        history.clear();
+        clear();
     }
 };
 

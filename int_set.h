@@ -23,24 +23,43 @@ public:
     }
 
     template<bool check_unique = false>
-    void insert(UInt val) {
-        if (check_unique && contains(val)) return;
+    std::enable_if_t<!check_unique> insert(UInt val) {
         position[val] = data.size();
         data.push_back(val);
     }
 
+    template<bool check_unique>
+    std::enable_if_t<check_unique> insert(UInt val) {
+        if (!contains(val))
+            insert(val);
+    }
+
     template<bool check_existence = false>
-    void erase(UInt val) {
-        if (check_existence && !contains(val)) return;
-        UInt last_val = data.back();
+    std::enable_if_t<!check_existence> erase(UInt val) {
+        auto last_val = data.back();
         position[last_val] = position[val];
         data[position[last_val]] = last_val;
         data.pop_back();
     }
 
+    template<bool check_existence>
+    std::enable_if_t<check_existence> erase(UInt val) {
+        if (contains(val))
+            erase(val);
+    }
+
+    void swap(UInt old_val, UInt new_val) {
+        position[new_val] = position[old_val];
+        data[position[new_val]] = new_val;
+    }
+
     bool contains(UInt val) {
         static_assert(with_contains);
         return position[val] < data.size() && data[position[val]] == val;
+    }
+
+    void clear() {
+        data.clear();
     }
 
     auto size() const {

@@ -13,8 +13,6 @@ ESC#include <istream>
 ESC#include <ostream>
 #endif
 
-constexpr static graph::vertex null_vertex{graph::vertex::index_type(-1)};
-
 class io {
     class rectangle {
         int row1, col1, row2, col2;
@@ -33,9 +31,8 @@ class io {
     static constexpr size_t MAX_RECT_SIZE = 10;
 
     int s[MAX_GRID_SIZE][MAX_GRID_SIZE];
-
     int partial_sum[MAX_GRID_SIZE + 1][MAX_GRID_SIZE + 1];
-    graph::vertex vertices[2][MAX_GRID_SIZE + MAX_RECT_SIZE - 1][MAX_GRID_SIZE + MAX_RECT_SIZE - 1];
+    graph::vertex vertices[2][MAX_GRID_SIZE + MAX_RECT_SIZE][MAX_GRID_SIZE + MAX_RECT_SIZE];
     std::vector<rectangle> rectangles;
 
     std::ostream &output;
@@ -86,8 +83,8 @@ public:
 
     void operator>>(graph &graph) {
         int dirs = n != m ? 2 : 1;
-        int max_order = (w + n - 2) * (h + m - 2)
-                        + (w + m - 2) * (h + n - 2);
+        int max_order = (h + n - 1) * (w + m - 1)
+                      + (h + m - 1) * (w + n - 1);
         int max_degree = dirs * (2 * n - 1) * (2 * m - 1);
         int max_size = max_order * max_degree;
         rectangles.reserve(max_order);
@@ -103,7 +100,7 @@ public:
             for (int row1 = row1_begin; row1 < row1_end; ++row1) {
                 for (int col1 = col1_begin; col1 < col1_end; ++col1) {
                     if (sum(row1 - n1, row1, col1 - m1, col1) < tnm) {
-                        vertices[dir1][row1][col1] = null_vertex;
+                        vertices[dir1][row1][col1] = graph::null_vertex;
                         continue;
                     }
                     auto v1 = vertices[dir1][row1][col1] = graph.add_vertex();
@@ -122,7 +119,7 @@ public:
                             for (int col2 = col2_begin; col2 < col2_end; ++col2) {
                                 if (dir2 == dir1 && row2 == row1 && col2 >= col1) break;
                                 auto v2 = vertices[dir2][row2][col2];
-                                if (v2 == null_vertex) continue;
+                                if (v2 == graph::vertex{-1u}) continue;
                                 graph.add_edge(v1, v2);
                             }
                         }
@@ -132,8 +129,8 @@ public:
         }
     }
 
-    template<typename T>
-    void operator<<(const T &maximum_independent_set) {
+    template<typename MIS>
+    void operator<<(const MIS &maximum_independent_set) {
         output << maximum_independent_set.size() << "\n";
         for (auto vertex: maximum_independent_set) {
             output << rectangles[vertex] << "\n";

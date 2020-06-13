@@ -22,6 +22,8 @@ public:
         }
     };
 
+    constexpr static vertex null_vertex{-1u};
+
     struct vertex_iterator {
         vertex::index_type index;
 
