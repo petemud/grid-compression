@@ -2,27 +2,28 @@
 #define GRID_COMPRESSION_TIMER_H
 
 #ifdef LOCAL
-#include <ctime>
+#include <chrono>
 #else
-ESC#include <ctime>
+ESC#include <chrono>
 #endif
 
+template<typename Duration, typename Clock = std::chrono::steady_clock>
 class timer {
-    std::clock_t start_point;
+    typename Clock::time_point start_point;
 
 public:
-    float max_duration;
+    Duration max_duration;
 
-    explicit timer(float max_duration): max_duration(max_duration) {
+    explicit timer(Duration max_duration): max_duration(max_duration) {
         start();
     }
 
     void start() {
-        start_point = clock();
+        start_point = Clock::now();
     }
 
     auto duration() const {
-        return float(clock() - start_point) / CLOCKS_PER_SEC;
+        return Clock::now() - start_point;
     }
 
     bool timeout() const {
