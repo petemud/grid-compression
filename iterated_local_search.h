@@ -10,7 +10,6 @@
 #ifdef LOCAL
 #include <vector>
 #include <array>
-#include <functional>
 
 #else
 ESC#include <vector>
@@ -249,7 +248,7 @@ public:
     template<bool record_transaction = true, bool update_candidates = true>
     void swap_to_solution(unsigned improve_time = 1000) {
         static unsigned taboo_counter = 0;
-        auto taboo_time = graph.order() / 2;
+        static auto taboo_time = graph.order() / 2;
         for (auto improve = improve_time; improve; --improve) {
             if (one_tight.empty()) return;
             auto vertex = random(one_tight);
@@ -276,7 +275,7 @@ public:
         } else {
             transaction.clear();
             if (with_swaps)
-                swap_to_solution<false, false>(1000);
+                swap_to_solution<false, false>();
             previous_solution_size = solution.size();
         }
 
