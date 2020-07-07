@@ -25,8 +25,15 @@ void run_until_timeout(Iteration iteration, const Timer &timer) {
     std::clog << "iterations: " << iterations << "\n";
 }
 
+template<typename Rep, typename Period>
+std::ostream& operator<<(std::ostream& ostream, const std::chrono::duration<Rep, Period> &duration) {
+    auto count = duration.count() * Period::num;
+    return ostream << count / Period::den << "." << count % Period::den;
+}
+
 int main() {
-    auto program_timer = timer(3.97);
+    auto duration = std::chrono::milliseconds(3970);
+    auto program_timer = timer<decltype(duration)>(duration);
 
     auto seed = *(uint32_t*)"grid";
     auto random = random_picker<std::mt19937>(seed);
